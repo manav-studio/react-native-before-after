@@ -18,7 +18,6 @@ import Animated, {
   useDerivedValue,
   useSharedValue,
   withTiming,
-  withDecay,
   useAnimatedReaction,
   runOnJS,
   withSpring,
@@ -28,16 +27,20 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useVector } from 'react-native-redash';
 import { clamp, withDecaySpring, withRubberBandClamp } from './utils';
 
+import {
+  EventsCallbacks,
+  ItemRef,
+  Props,
+  RenderItem,
+  RenderItemInfo,
+} from './types';
+import { LANDSCAPE, POTRAIT } from './utils/constants';
+
 const rtl = I18nManager.isRTL;
 
 const DOUBLE_TAP_SCALE = 3;
 const MAX_SCALE = 6;
 const SPACE_BETWEEN_IMAGES = 40;
-
-type Dimensions = {
-  height: number;
-  width: number;
-};
 
 export const snapPoint = (
   value: number,
@@ -49,12 +52,6 @@ export const snapPoint = (
   const deltas = points.map((p) => Math.abs(point - p));
   const minDelta = Math.min.apply(null, deltas);
   return points.filter((p) => Math.abs(point - p) === minDelta)[0];
-};
-
-export type RenderItemInfo<T> = {
-  index: number;
-  item: T;
-  setImageDimensions: (imageDimensions: Dimensions) => void;
 };
 
 const defaultRenderImage = ({
@@ -73,53 +70,21 @@ const defaultRenderImage = ({
     />
   );
 };
-
-type EventsCallbacks = {
-  onSwipeToClose?: () => void;
-  onTap?: () => void;
-  onDoubleTap?: () => void;
-  onLongPress?: () => void;
-  onScaleStart?: () => void;
-  onScaleEnd?: (scale: number) => void;
-  onPanStart?: () => void;
-};
-
-type RenderItem<T> = (
-  imageInfo: RenderItemInfo<T>
-) => React.ReactElement | null;
-
-type Props<T> = EventsCallbacks & {
-  item: T;
-  index: number;
-  isFirst: boolean;
-  isLast: boolean;
-  translateX: Animated.SharedValue<number>;
-  currentIndex: Animated.SharedValue<number>;
-  renderItem: RenderItem<T>;
-  width: number;
-  height: number;
-  length: number;
-
-  emptySpaceWidth: number;
-  doubleTapInterval: number;
-  doubleTapScale: number;
-  maxScale: number;
-  pinchEnabled: boolean;
-  disableTransitionOnScaledImage: boolean;
-  hideAdjacentImagesOnScaledImage: boolean;
-  disableVerticalSwipe: boolean;
-  disableSwipeUp?: boolean;
-  loop: boolean;
-  onScaleChange?: (scale: number) => void;
-  onScaleChangeRange?: { start: number; end: number };
-
-  setRef: (index: number, value: ItemRef) => void;
-};
-
-type ItemRef = { reset: (animated: boolean) => void };
-
 const ResizableImage = React.memo(
   <T extends any>({
+    // setAllCroppedImageURI,
+    // sliderSize,
+    // SliderComponent,
+    // showSeparationLine,
+    // separationLineStyles,
+    // compareSlider,
+    // leftImage,
+    // rightImage,
+    shouldScaleToFit,
+    // imageType,
+    // scaleToFit,
+    setIsFaceDetected,
+    // faceRects,
     item,
     translateX,
     index,
@@ -151,6 +116,88 @@ const ResizableImage = React.memo(
     onScaleChangeRange,
     setRef,
   }: Props<T>) => {
+    const [faceRects, setFaceRects] = useState<any>();
+
+    const [scaleToFit, setScaleToFit] = useState(1);
+
+    const [imageType, setImageType] = useState(undefined);
+
+    // useEffect(() => {
+    //   (async () => {
+    //     if (!compareSlider) {
+    //       try {
+    //         let newWidth = 0;
+    //         let newHeight = 0;
+
+    //         Image.getSize(leftImage.uri, async (width, height) => {
+    //           newWidth = width;
+    //           newHeight = height;
+    //           await getFaceRects(
+    //             item,
+    //             newWidth,
+    //             newHeight,
+    //             width,
+    //             setFaceRects
+    //           ); // aka viewPortWidth
+    //           if (shouldScaleToFit)
+    //             await getScaleToFit(newWidth, newHeight, setScaleToFit);
+    //           await setImageTypeOnUseState(newWidth, newHeight, setImageType);
+    //         });
+    //       } catch (error) {
+    //         console.warn(`[FaceDetect] error in useEffect === ${error}`);
+    //         console.warn(
+    //           `[FaceDetect] error in useEffect === ${JSON.stringify(error)}`
+    //         );
+    //       }
+    //     }
+    //   })();
+    // }, [
+    //   item,
+    //   shouldScaleToFit,
+    //   compareSlider,
+    //   // setFaceRects, setScaleToFit, setImageType
+    // ]);
+    // useEffect(() => {
+    //   (async () => {
+    //     if (compareSlider && rightImage) {
+    //       try {
+    //         let newWidth = 0;
+    //         let newHeight = 0;
+
+    //         // @ts-ignore
+    //         Image.getSize(rightImage.uri, async (width, height) => {
+    //           newWidth = width;
+    //           newHeight = height;
+
+    //           // @ts-ignore
+    //           const detectdeFaceRects = await getFaceRects(
+    //             rightImage.uri,
+    //             newWidth,
+    //             newHeight,
+    //             width
+    //           ); // aka viewPortWidth
+    //           const allCroppedImages = await getCroppedImageURI(
+    //             rightImage.uri,
+    //             detectdeFaceRects
+    //           );
+    //           setAllCroppedImageURI(allCroppedImages);
+
+    //           if (shouldScaleToFit)
+    //             getScaleToFit(newWidth, newHeight, setScaleToFit);
+    //           setImageTypeOnUseState(newWidth, newHeight, setImageType);
+    //         });
+    //       } catch (error) {
+    //         console.warn(`[awesome-gallery] error in useEffect === ${error}`);
+    //         console.warn(
+    //           `[awesome-gallery] error in useEffect === ${JSON.stringify(
+    //             error
+    //           )}`
+    //         );
+    //       }
+    //     }
+    //   })();
+    // }, [rightImage, shouldScaleToFit, compareSlider]);
+
     const CENTER = {
       x: width / 2,
       y: height / 2,
@@ -169,9 +216,45 @@ const ResizableImage = React.memo(
     const originalLayout = useVector(width, 0);
     const layout = useVector(width, 0);
 
-    const isActive = useDerivedValue(() => currentIndex.value === index, [
-      currentIndex,
-    ]);
+    const isActive = useDerivedValue(
+      () => currentIndex.value === index,
+      [currentIndex]
+    );
+    const [newFaceRects, setNewFaceRects] = useState<any>();
+
+    useEffect(() => {
+      scale.value = withTiming(scaleToFit);
+      if (faceRects?.length > 0) {
+        if (imageType === LANDSCAPE) {
+          let newY = [...faceRects];
+          // get distance from Y based on scaleToFit
+          const newHeight = scaleToFit * height; // aka viewPortHeight
+          const point = (newHeight - height) / 2; // aka viewPortHeight
+          const distanceFromY = Math.abs(point);
+          newY[0] = {
+            ...newY[0],
+            y: newY[0]?.y + distanceFromY,
+          };
+          setNewFaceRects(newY);
+        } else if (imageType === POTRAIT) {
+          let newX = [...faceRects];
+
+          // get distance from Y based on scaleToFit
+          const newWidth = scaleToFit * width; // aka viewPortWidth
+          const point = (newWidth - width) / 2; // aka viewPortWidth
+          const distanceFromX = Math.abs(point);
+
+          newX[0] = {
+            ...newX[0],
+            y: newX[0]?.x - distanceFromX * 0.5,
+          };
+          setNewFaceRects(newX);
+        } else {
+          setNewFaceRects(faceRects);
+        }
+        // setNewFaceRects(faceRects);
+      }
+    }, [scaleToFit, faceRects, imageType]);
 
     useAnimatedReaction(
       () => {
@@ -209,7 +292,7 @@ const ResizableImage = React.memo(
     const resetValues = (animated = true) => {
       'worklet';
 
-      scale.value = animated ? withTiming(1) : 1;
+      scale.value = animated ? withTiming(scaleToFit) : scaleToFit;
       offset.x.value = animated ? withTiming(0) : 0;
       offset.y.value = animated ? withTiming(0) : 0;
       translation.x.value = animated ? withTiming(0) : 0;
@@ -271,6 +354,7 @@ const ResizableImage = React.memo(
 
       translation.x.value = 0;
       translation.y.value = 0;
+      // runOnJS();
     };
 
     const getPosition = (i?: number) => {
@@ -316,6 +400,33 @@ const ResizableImage = React.memo(
     useEffect(() => {
       setRef(index, {
         reset: (animated: boolean) => resetValues(animated),
+        setFocal: ({ x, y }: any) => {
+          // resetValues();
+          setAdjustedFocal({ focalX: x, focalY: y });
+        },
+        zoomIn: ({ x, y }: any) => {
+          console.log(`[zoomIn] [x] === ${x}`);
+          console.log(`[zoomIn] [y] === ${y}`);
+          console.log(`[zoomIn] doubleTapScale === ${doubleTapScale}`);
+
+          // setAdjustedFocal({ focalX: x, focalY: y });
+          scale.value = withTiming(doubleTapScale);
+
+          offset.x.value = withTiming(
+            clampX(
+              adjustedFocal.x.value +
+                -1 * doubleTapScale * adjustedFocal.x.value,
+              doubleTapScale
+            )
+          );
+          offset.y.value = withTiming(
+            clampY(
+              adjustedFocal.y.value +
+                -1 * doubleTapScale * adjustedFocal.y.value,
+              doubleTapScale
+            )
+          );
+        },
       });
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [index]);
@@ -392,6 +503,55 @@ const ResizableImage = React.memo(
 
     const scaleOffset = useSharedValue(1);
 
+    const distanceY = useDerivedValue(() => {
+      if (scale.value <= 1 && faceRects?.length > 0) {
+        return newFaceRects ? newFaceRects[0].y : 0;
+      } else if (scale.value > 1 && faceRects?.length > 0)
+        return newFaceRects[0].y * scale.value;
+      return newFaceRects;
+    }, [scale.value, newFaceRects]);
+
+    const distanceX = useDerivedValue(() => {
+      if (scale.value <= 1 && faceRects?.length > 0) {
+        return newFaceRects ? newFaceRects[0].x : 0;
+      } else if (scale.value > 1 && faceRects?.length > 0)
+        return newFaceRects[0].x * scale.value + newFaceRects[0].width;
+      return newFaceRects;
+    }, [scale.value, newFaceRects]);
+
+    useAnimatedReaction(
+      () => {
+        return {
+          offsetXvalue: offset.x.value,
+          offsetYvalue: offset.y.value,
+        };
+      },
+      ({ offsetXvalue, offsetYvalue }) => {
+        const edgeX = getEdgeX();
+        const edgeY = getEdgeY();
+
+        const distanceFromViewPortX = distanceX.value - edgeX[1] + offsetXvalue;
+        if (
+          distanceFromViewPortX <= width &&
+          distanceY.value + offsetYvalue >= edgeY[1]
+        ) {
+          console.log(`xxxxxxxxxxxxxxxxxxx face detected ------------`);
+          if (setIsFaceDetected) runOnJS(setIsFaceDetected)(true);
+        } else {
+          if (setIsFaceDetected) runOnJS(setIsFaceDetected)(false);
+        }
+      },
+      [
+        offset.x.value,
+        width,
+        distanceX.value,
+        offset.y.value,
+        distanceY.value,
+        height,
+        setIsFaceDetected,
+      ]
+    );
+
     const pinchGesture = Gesture.Pinch()
       .enabled(pinchEnabled)
       .onStart(({ focalX, focalY }) => {
@@ -459,11 +619,11 @@ const ResizableImage = React.memo(
                 ((-1 * maxScale) / scaleOffset.value) * origin.y.value
               : translation.y.value;
 
-          const diffX = nextTransX + offset.x.value - (newWidth - width) / 2;
-
           if (scale.value > maxScale) {
             scale.value = withTiming(maxScale);
           }
+          // for x
+          const diffX = nextTransX + offset.x.value - (newWidth - width) / 2;
 
           if (newWidth <= width) {
             translation.x.value = withTiming(0);
@@ -485,6 +645,7 @@ const ResizableImage = React.memo(
             }
           }
 
+          // for y
           const diffY = nextTransY + offset.y.value - (newHeight - height) / 2;
 
           if (newHeight <= height) {
@@ -536,26 +697,27 @@ const ResizableImage = React.memo(
           cancelAnimation(offset.y);
         }
       })
-      .onStart(({ velocityY, velocityX }) => {
+      .onStart(({ velocityY, velocityX }: any) => {
         'worklet';
         if (!isActive.value) return;
 
         if (onPanStart) {
           runOnJS(onPanStart)();
         }
+        onStart(); // here offset is value is set:  offset.x.value = offset.x.value + translation.x.value;
+        // console.log(`[panOnStart] offset.x.value === ${offset.x.value}`);
+        console.log(`[panOnStart] offset.y.value === ${offset.y.value}`);
 
-        onStart();
         isVertical.value = Math.abs(velocityY) > Math.abs(velocityX);
         initialTranslateX.value = translateX.value;
       })
-      .onUpdate(({ translationX, translationY, velocityY }) => {
-        'worklet';
-        if (!isActive.value) return;
-        if (disableVerticalSwipe && scale.value === 1 && isVertical.value)
-          return;
+      .onUpdate(({ translationX, translationY, velocityY }: any) => {
+        ('worklet');
+        // if (!isActive.value) return;
+        // if (disableVerticalSwipe && scale.value === 1 && isVertical.value) return;
 
+        // for x
         const x = getEdgeX();
-
         if (!isVertical.value || scale.value > 1) {
           const clampedX = clamp(
             translationX,
@@ -610,10 +772,9 @@ const ResizableImage = React.memo(
           }
         }
 
-        const newHeight = scale.value * layout.y.value;
-
+        // for y
         const edgeY = getEdgeY();
-
+        const newHeight = scale.value * layout.y.value;
         if (newHeight > height) {
           translation.y.value = withRubberBandClamp(
             translationY,
@@ -636,13 +797,12 @@ const ResizableImage = React.memo(
         }
       })
       .onEnd(({ velocityX, velocityY }) => {
-        'worklet';
-        if (!isActive.value) return;
+        ('worklet');
 
-        const newHeight = scale.value * layout.y.value;
+        // if (!isActive.value) return;
 
+        // for x
         const edgeX = getEdgeX();
-
         if (
           Math.abs(translateX.value - getPosition()) >= 0 &&
           edgeX.some((x) => x === translation.x.value + offset.x.value)
@@ -719,15 +879,20 @@ const ResizableImage = React.memo(
             }
           );
         }
+        console.log(
+          `[panOnEnd] offset.x_y === ${offset.x.value}_${offset.y.value}`
+        );
+        // // no applicable for our use case
+        // if (onSwipeToClose && shouldClose.value) {
+        //   offset.y.value = withDecay({
+        //     velocity: velocityY,
+        //   });
+        //   runOnJS(onSwipeToClose)();
+        //   return;
+        // }
 
-        if (onSwipeToClose && shouldClose.value) {
-          offset.y.value = withDecay({
-            velocity: velocityY,
-          });
-          runOnJS(onSwipeToClose)();
-          return;
-        }
-
+        // for y
+        const newHeight = scale.value * layout.y.value;
         if (newHeight > height) {
           isMoving.y.value = 1;
           offset.y.value = withDecaySpring(
@@ -797,8 +962,10 @@ const ResizableImage = React.memo(
           runOnJS(onDoubleTap)();
         }
 
-        if (scale.value === 1) {
+        if (scale.value === scaleToFit) {
           scale.value = withTiming(doubleTapScale);
+          console.log(`[doubleTapGesture] x === ${x}`);
+          console.log(`[doubleTapGesture] y === ${y}`);
 
           setAdjustedFocal({ focalX: x, focalY: y });
 
@@ -846,9 +1013,78 @@ const ResizableImage = React.memo(
         )}
       >
         <View style={{ width, height }}>
+          {/* {compareSlider ? (
+            <CompareSlider
+              before={
+                <Animated.View style={[{ width, height }, animatedStyle]}>
+                  <Image
+                    onLoad={(e) => {
+                      const { height: h, width: w } = e.nativeEvent.source;
+                      setImageDimensions({ height: h, width: w });
+                    }}
+                    source={leftImage}
+                    resizeMode="contain"
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                  <View
+                    style={{
+                      position: 'absolute',
+                      borderWidth: 1,
+                      borderColor: 'green',
+                      width: newFaceRects ? newFaceRects[0]?.width : 0,
+                      height: newFaceRects ? newFaceRects[0]?.height : 0,
+                      left: newFaceRects ? newFaceRects[0]?.x : 0,
+                      top: newFaceRects ? newFaceRects[0]?.y : 0,
+                    }}
+                  />
+                </Animated.View>
+              }
+              after={
+                <Animated.View style={[{ width, height }, animatedStyle]}>
+                  <Image
+                    onLoad={(e) => {
+                      const { height: h, width: w } = e.nativeEvent.source;
+                      setImageDimensions({ height: h, width: w });
+                    }}
+                    source={rightImage}
+                    resizeMode="contain"
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                  <View
+                    style={{
+                      position: 'absolute',
+                      borderWidth: 1,
+                      borderColor: 'green',
+                      width: newFaceRects ? newFaceRects[0]?.width : 0,
+                      height: newFaceRects ? newFaceRects[0]?.height : 0,
+                      left: newFaceRects ? newFaceRects[0]?.x : 0,
+                      top: newFaceRects ? newFaceRects[0]?.y : 0,
+                    }}
+                  />
+                </Animated.View>
+              }
+              sliderSize={sliderSize}
+              SliderComponent={SliderComponent}
+              showSeparationLine={showSeparationLine}
+              separationLineStyles={separationLineStyles}
+              containerSize={{ width: width, height: height }}
+            />
+          ) : ( */}
           <Animated.View style={[{ width, height }, animatedStyle]}>
             {renderItem(itemProps)}
+            <View
+              style={{
+                position: 'absolute',
+                borderWidth: 1,
+                borderColor: 'green',
+                width: newFaceRects ? newFaceRects[0]?.width : 0,
+                height: newFaceRects ? newFaceRects[0]?.height : 0,
+                left: newFaceRects ? newFaceRects[0]?.x : 0,
+                top: newFaceRects ? newFaceRects[0]?.y : 0,
+              }}
+            />
           </Animated.View>
+          {/* )} */}
         </View>
       </GestureDetector>
     );
@@ -857,14 +1093,25 @@ const ResizableImage = React.memo(
 
 export type GalleryRef = {
   setIndex: (newIndex: number) => void;
-  reset: (animated?: boolean) => void;
+  reset?: (animated?: boolean) => void;
+  zoomIn: ({ x, y }: any) => void;
 };
 
 export type GalleryReactRef = React.Ref<GalleryRef>;
 
 type GalleryProps<T> = EventsCallbacks & {
+  setAllCroppedImageURI?: any;
+  sliderSize?: any;
+  SliderComponent?: any;
+  showSeparationLine?: boolean;
+  separationLineStyles?: ViewStyle;
+  rightImage?: any;
+  leftImage?: any;
+  compareSlider?: boolean;
+  shouldScaleToFit?: boolean;
+  setIsFaceDetected?: any;
   ref?: GalleryReactRef;
-  data: T[];
+  data?: T[];
 
   renderItem?: RenderItem<T>;
   keyExtractor?: (item: T, index: number) => string | number;
@@ -889,6 +1136,16 @@ type GalleryProps<T> = EventsCallbacks & {
 
 const GalleryComponent = <T extends any>(
   {
+    // setAllCroppedImageURI,
+    // sliderSize,
+    // SliderComponent,
+    // showSeparationLine,
+    // separationLineStyles,
+    // leftImage,
+    // compareSlider,
+    shouldScaleToFit = true,
+    setIsFaceDetected,
+    // faceRects,
     data,
     renderItem = defaultRenderImage,
     initialIndex = 0,
@@ -913,10 +1170,11 @@ const GalleryComponent = <T extends any>(
   }: GalleryProps<T>,
   ref: GalleryReactRef
 ) => {
+  const tempData = data;
   const windowDimensions = useWindowDimensions();
   const dimensions = containerDimensions || windowDimensions;
 
-  const isLoop = loop && data?.length > 1;
+  const isLoop = loop && tempData?.length > 1;
 
   const [index, setIndex] = useState(initialIndex);
 
@@ -937,7 +1195,7 @@ const GalleryComponent = <T extends any>(
   }));
 
   const changeIndex = useCallback(
-    (newIndex) => {
+    (newIndex: any) => {
       onIndexChange?.(newIndex);
       setIndex(newIndex);
     },
@@ -962,30 +1220,40 @@ const GalleryComponent = <T extends any>(
       currentIndex.value = newIndex;
       translateX.value = newIndex * -(dimensions.width + emptySpaceWidth);
     },
+    setFocal({ x, y }: any) {
+      refs.current?.forEach((itemRef) => {
+        itemRef.setFocal({ x, y });
+      });
+    },
+    zoomIn({ x, y }) {
+      refs.current?.forEach((itemRef) => {
+        itemRef.zoomIn({ x, y });
+      });
+    },
     reset(animated = false) {
       refs.current?.forEach((itemRef) => itemRef.reset(animated));
     },
   }));
 
   useEffect(() => {
-    if (index >= data.length) {
-      const newIndex = data.length - 1;
+    if (index >= tempData.length) {
+      const newIndex = tempData.length - 1;
       setIndex(newIndex);
       currentIndex.value = newIndex;
       translateX.value = newIndex * -(dimensions.width + emptySpaceWidth);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data?.length]);
+  }, [tempData?.length]);
 
   return (
     <View style={[{ flex: 1, backgroundColor: 'black' }, style]}>
       <Animated.View style={[{ flex: 1, flexDirection: 'row' }, animatedStyle]}>
-        {data.map((item: any, i) => {
+        {tempData.map((item: any, i) => {
           const isFirst = i === 0;
 
           const outOfLoopRenderRange =
             !isLoop ||
-            (Math.abs(i - index) < data.length - (numToRender - 1) / 2 &&
+            (Math.abs(i - index) < tempData.length - (numToRender - 1) / 2 &&
               Math.abs(i - index) > (numToRender - 1) / 2);
 
           const hidden =
@@ -1008,13 +1276,24 @@ const GalleryComponent = <T extends any>(
                 // @ts-ignore
                 <ResizableImage
                   {...{
+                    // setAllCroppedImageURI,
+                    // sliderSize,
+                    // SliderComponent,
+                    // showSeparationLine,
+                    // separationLineStyles,
+                    // compareSlider,
+                    // leftImage,
+                    shouldScaleToFit,
+                    // scaleToFit,
+                    setIsFaceDetected,
+                    // faceRects,
                     translateX,
                     item,
                     currentIndex,
                     index: i,
                     isFirst,
-                    isLast: i === data.length - 1,
-                    length: data.length,
+                    isLast: i === tempData.length - 1,
+                    length: tempData.length,
                     renderItem,
                     emptySpaceWidth,
                     doubleTapScale,
