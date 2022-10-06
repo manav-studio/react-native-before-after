@@ -21,7 +21,8 @@
 First you have to follow installation instructions of [Reanimated v2](https://docs.swmansion.com/react-native-reanimated/) and [react-native-gesture-handler](https://docs.swmansion.com/react-native-gesture-handler/)
 
 ```sh
-yarn add react-native-awesome-gallery
+For now install using git from this repo using yarn.
+Instructions are comming soon.
 ```
 
 Expo is supported since SDK 40. More information [here](https://docs.expo.io/versions/latest/sdk/reanimated/)
