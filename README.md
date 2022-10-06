@@ -1,5 +1,3 @@
-[![npm version](https://badge.fury.io/js/react-native-awesome-gallery.svg)](https://badge.fury.io/js/react-native-awesome-gallery)
-
 <div style="text-align: center;">
   <h1 align="center">React Native Before After</h1>
 
@@ -10,7 +8,6 @@
 - Zoom to scale
 - Double tap to scale
 - Native iOS feeling (rubber effect, decay animation on pan gesture)
-- RTL support
 - Fully customizable
 - Both orientations (portrait + landscape)
 - Infinite list
